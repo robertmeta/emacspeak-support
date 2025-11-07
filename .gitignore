@@ -1,0 +1,31 @@
+# Emacs temporary files
+*~
+\#*\#
+.\#*
+
+# Byte-compiled files
+*.elc
+
+# Autoloads
+*-autoloads.el
+
+# Package directory
+.packages/
+
+# Backup files
+*.bak
+*.backup
+
+# macOS
+.DS_Store
+
+# Emacs directory local variables
+.dir-locals.el
+
+# ELPA/package build artifacts
+*-pkg.el
+dist/
+
+# Emacs desktop file
+.emacs.desktop
+.emacs.desktop.lock
