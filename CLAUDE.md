@@ -26,6 +26,17 @@ Files in this repository follow the standard Emacspeak extension pattern:
 - **Helper functions**: Create package-specific helpers to extract current state and format speech output
 - **Annotation support**: When applicable, use completion metadata functions to include annotations in spoken output
 
+### File Structure Order
+
+1. Header comments (copyright, commentary)
+2. Required modules (`emacspeak-preamble`, target package)
+3. Voice mappings (`voice-setup-add-map`)
+4. Buffer-local state variables (`defvar-local`)
+5. Helper functions
+6. Interactive command advice
+7. Internal function advice
+8. `(provide 'emacspeak-PACKAGE)`
+
 ## Development Notes
 
 ### Emacspeak Integration
@@ -33,6 +44,7 @@ Files in this repository follow the standard Emacspeak extension pattern:
 - All extensions require `emacspeak-preamble` which provides core speech functions
 - Use `cl-declaim (optimize (safety 0) (speed 3))` for performance-critical advice
 - Follow Emacspeak's convention of checking `(ems-interactive-p)` before speaking in advised functions
+- Advice names should be `emacspeak` (e.g., `(defadvice fn-name (after emacspeak pre act comp)`)
 - Use `voice-annotate`, `voice-bolden`, `voice-smoothen`, and `voice-monotone` personalities consistently
 
 ### Testing
@@ -44,6 +56,15 @@ Files in this repository follow the standard Emacspeak extension pattern:
   - UI updates speak current selection
   - Auditory icons play at appropriate times
   - Annotations are properly voiced when available
+
+### Loading Extensions
+
+To test an extension in a running Emacspeak session:
+```elisp
+(load-file "/path/to/emacspeak-corfu.el")
+```
+
+Or evaluate the buffer with `M-x eval-buffer` after opening the file with `emc`.
 
 ### Code Style
 

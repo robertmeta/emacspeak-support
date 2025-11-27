@@ -34,6 +34,10 @@
 (require 'emacspeak-preamble)
 (require 'corfu nil 'noerror)
 
+;;;  Forward declarations:
+
+(declare-function corfu--update "corfu" (&optional interruptible))
+
 ;;;  Map faces to voices:
 
 (voice-setup-add-map
@@ -44,7 +48,7 @@
    (corfu-annotations voice-annotate)
    (corfu-deprecated voice-monotone-extra)))
 
-;;;  Define bookkeeping variables for UI state:
+;;;  Bookkeeping variables for UI state:
 
 (defvar-local emacspeak-corfu--prev-candidate nil
   "Previously spoken candidate.")
@@ -56,6 +60,7 @@
 
 (defun emacspeak-corfu--current-candidate ()
   "Return the currently selected candidate in Corfu."
+  (cl-declare (special corfu--candidates corfu--index))
   (when (and (bound-and-true-p corfu--candidates)
              (bound-and-true-p corfu--index)
              (>= corfu--index 0)
@@ -64,6 +69,7 @@
 
 (defun emacspeak-corfu--candidate-with-annotation ()
   "Return current candidate with its annotation if available."
+  (cl-declare (special corfu--metadata))
   (let ((candidate (emacspeak-corfu--current-candidate)))
     (when candidate
       (let* ((metadata (and (boundp 'corfu--metadata) corfu--metadata))
@@ -74,46 +80,66 @@
             (concat candidate " " (propertize annotation 'personality 'voice-annotate))
           candidate)))))
 
+(defun emacspeak-corfu--speak-candidate ()
+  "Speak current candidate with position info."
+  (cl-declare (special corfu--index corfu--candidates))
+  (let ((candidate (emacspeak-corfu--candidate-with-annotation))
+        (total (length corfu--candidates))
+        (index (1+ corfu--index)))
+    (when candidate
+      (dtk-speak (format "%d of %d: %s" index total candidate)))))
+
 ;;;  Advice interactive commands:
 
-(defadvice corfu-next (after emacspeak pre act comp)
-  "Speak the newly selected candidate."
-  (when (ems-interactive-p)
-    (emacspeak-icon 'select-object)
-    (let ((candidate (emacspeak-corfu--candidate-with-annotation)))
-      (when candidate
-        (dtk-speak candidate)))))
-
-(defadvice corfu-previous (after emacspeak pre act comp)
-  "Speak the newly selected candidate."
-  (when (ems-interactive-p)
-    (emacspeak-icon 'select-object)
-    (let ((candidate (emacspeak-corfu--candidate-with-annotation)))
-      (when candidate
-        (dtk-speak candidate)))))
-
-(defadvice corfu-insert (after emacspeak pre act comp)
-  "Speak the inserted candidate."
-  (when (ems-interactive-p)
-    (emacspeak-icon 'complete)
-    (dtk-speak (or emacspeak-corfu--prev-candidate "completed"))))
-
-(defadvice corfu-complete (after emacspeak pre act comp)
-  "Speak completion feedback."
-  (when (ems-interactive-p)
-    (emacspeak-icon 'complete)))
+(defadvice corfu-insert (around emacspeak pre act comp)
+  "Speak the inserted text."
+  (let ((start (point)))
+    ad-do-it
+    (when (ems-interactive-p)
+      (emacspeak-icon 'complete)
+      (emacspeak-speak-region start (point)))
+    ad-return-value))
 
 (defadvice corfu-quit (after emacspeak pre act comp)
   "Speak quit feedback."
   (when (ems-interactive-p)
-    (emacspeak-icon 'close-object)
-    (dtk-speak "completion cancelled")))
+    (dtk-stop 'all)
+    (emacspeak-icon 'close-object)))
+
+(defadvice corfu-reset (after emacspeak pre act comp)
+  "Speak reset feedback."
+  (when (ems-interactive-p)
+    (emacspeak-icon 'item)
+    (dtk-speak "reset")))
 
 (defadvice corfu-insert-separator (after emacspeak pre act comp)
   "Speak separator insertion."
   (when (ems-interactive-p)
     (emacspeak-icon 'item)
     (dtk-speak "separator")))
+
+(defadvice corfu-complete (after emacspeak pre act comp)
+  "Speak completion feedback."
+  (when (ems-interactive-p)
+    (emacspeak-icon 'complete)))
+
+;;; Batch advice for navigation commands:
+
+(cl-loop
+ for (f icon) in
+ '((corfu-next select-object)
+   (corfu-previous select-object)
+   (corfu-first large-movement)
+   (corfu-last large-movement)
+   (corfu-scroll-up scroll)
+   (corfu-scroll-down scroll))
+ do
+ (eval
+  `(defadvice ,f (after emacspeak pre act comp)
+     "Speak the newly selected candidate."
+     (when (ems-interactive-p)
+       (emacspeak-icon ',icon)
+       (emacspeak-corfu--speak-candidate)))))
 
 ;;;  Advice internal update function to speak candidate changes:
 
@@ -123,19 +149,34 @@
   (when (and (boundp 'corfu--index)
              (boundp 'corfu--candidates)
              corfu--candidates)
-    (let ((new-cand (emacspeak-corfu--current-candidate))
-          (to-speak nil))
+    (let ((new-cand (emacspeak-corfu--current-candidate)))
       (unless (equal emacspeak-corfu--prev-candidate new-cand)
-        (setq to-speak (emacspeak-corfu--candidate-with-annotation))
-        ;; Play icon when selection changes
         (when (and (not (equal corfu--index emacspeak-corfu--prev-index))
                    (>= corfu--index 0))
-          (emacspeak-icon 'select-object)))
-      (when to-speak
-        (dtk-speak to-speak))
+          (emacspeak-icon 'select-object))
+        (when new-cand
+          (emacspeak-corfu--speak-candidate)))
       (setq-local
        emacspeak-corfu--prev-candidate new-cand
        emacspeak-corfu--prev-index corfu--index))))
+
+;;;  Setup hooks:
+
+(defun emacspeak-corfu--completion-hook ()
+  "Hook for completion-in-region-mode changes."
+  (cl-declare (special completion-in-region-mode))
+  (cond
+   (completion-in-region-mode
+    (emacspeak-icon 'open-object))
+   (t
+    (setq-local emacspeak-corfu--prev-candidate nil
+                emacspeak-corfu--prev-index nil))))
+
+(defun emacspeak-corfu-setup ()
+  "Setup Emacspeak support for Corfu."
+  (add-hook 'completion-in-region-mode-hook #'emacspeak-corfu--completion-hook))
+
+(eval-after-load "corfu" #'emacspeak-corfu-setup)
 
 ;;;  Provide the module:
 
