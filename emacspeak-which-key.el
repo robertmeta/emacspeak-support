@@ -114,8 +114,7 @@
 
 (defadvice which-key--show-page (after emacspeak pre act comp)
   "Speak the which-key page."
-  (when (and emacspeak-which-key--auto-speak
-             (ems-interactive-p))
+  (when emacspeak-which-key--auto-speak
     (emacspeak-icon 'help)
     (emacspeak-which-key--speak-page)))
 
