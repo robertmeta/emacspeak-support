@@ -47,6 +47,7 @@
   '((corfu . "emacspeak-corfu")
     (which-key . "emacspeak-which-key")
     (markdown . "emacspeak-markdown")
+    (helm . "emacspeak-helm")
     (voiceover . "voiceover-support"))
   "Alist of extension symbols to file names.")
 
@@ -189,6 +190,21 @@
   "Toggle Emacspeak support for Markdown."
   (interactive)
   (emacspeak-support-toggle 'markdown))
+
+(defun emacspeak-support-enable-helm ()
+  "Enable Emacspeak support for Helm."
+  (interactive)
+  (emacspeak-support-enable 'helm))
+
+(defun emacspeak-support-disable-helm ()
+  "Disable Emacspeak support for Helm."
+  (interactive)
+  (emacspeak-support-disable 'helm))
+
+(defun emacspeak-support-toggle-helm ()
+  "Toggle Emacspeak support for Helm."
+  (interactive)
+  (emacspeak-support-toggle 'helm))
 
 (defun emacspeak-support-enable-voiceover ()
   "Enable VoiceOver-style keybindings."
