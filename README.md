@@ -158,15 +158,6 @@ Speech-enables Helm, a powerful incremental completion and selection framework.
 
 **Based on:** Patch by Parham Doustdar (Emacspeak mailing list, December 26, 2025)
 
-### voiceover-support
-
-Provides VoiceOver-style navigation keybindings for Emacspeak.
-
-**Features:**
-
-- Familiar keybindings for users coming from macOS VoiceOver
-- Enable with `emacspeak-support-enable-voiceover`
-
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:

@@ -29,7 +29,7 @@
 ;;   M-x emacspeak-support-enable-corfu
 ;;   M-x emacspeak-support-enable-which-key
 ;;   M-x emacspeak-support-enable-markdown
-;;   M-x emacspeak-support-enable-voiceover
+;;   M-x emacspeak-support-enable-helm
 ;;   M-x emacspeak-support-toggle-<extension>
 ;;   M-x emacspeak-support-enable-all
 ;;   M-x emacspeak-support-disable-all
@@ -47,8 +47,7 @@
   '((corfu . "emacspeak-corfu")
     (which-key . "emacspeak-which-key")
     (markdown . "emacspeak-markdown")
-    (helm . "emacspeak-helm")
-    (voiceover . "voiceover-support"))
+    (helm . "emacspeak-helm"))
   "Alist of extension symbols to file names.")
 
 (defvar emacspeak-support--enabled '()
@@ -205,21 +204,6 @@
   "Toggle Emacspeak support for Helm."
   (interactive)
   (emacspeak-support-toggle 'helm))
-
-(defun emacspeak-support-enable-voiceover ()
-  "Enable VoiceOver-style keybindings."
-  (interactive)
-  (emacspeak-support-enable 'voiceover))
-
-(defun emacspeak-support-disable-voiceover ()
-  "Disable VoiceOver-style keybindings."
-  (interactive)
-  (emacspeak-support-disable 'voiceover))
-
-(defun emacspeak-support-toggle-voiceover ()
-  "Toggle VoiceOver-style keybindings."
-  (interactive)
-  (emacspeak-support-toggle 'voiceover))
 
 ;;;  Provide the module:
 
