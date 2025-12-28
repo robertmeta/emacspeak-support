@@ -50,6 +50,9 @@ Or selectively enable extensions when their corresponding packages load:
 
 (with-eval-after-load 'markdown-mode
   (emacspeak-support-enable-markdown))
+
+(with-eval-after-load 'helm
+  (emacspeak-support-enable-helm))
 ```
 
 See `example-config.el` for a complete configuration example.
@@ -65,16 +68,19 @@ Each extension can be toggled on or off independently:
 M-x emacspeak-support-enable-corfu
 M-x emacspeak-support-enable-which-key
 M-x emacspeak-support-enable-markdown
+M-x emacspeak-support-enable-helm
 
 ;; Disable specific extensions
 M-x emacspeak-support-disable-corfu
 M-x emacspeak-support-disable-which-key
 M-x emacspeak-support-disable-markdown
+M-x emacspeak-support-disable-helm
 
 ;; Toggle extensions on/off
 M-x emacspeak-support-toggle-corfu
 M-x emacspeak-support-toggle-which-key
 M-x emacspeak-support-toggle-markdown
+M-x emacspeak-support-toggle-helm
 ```
 
 ### Enable/Disable All Extensions
@@ -138,6 +144,19 @@ Speech-enables markdown-mode for better navigation of markdown documents.
 - Smart navigation between headers, links, and list items
 - Appropriate voice personalities for different markdown elements
 - Keybinding: `C-c C-s h` to speak current heading
+
+### emacspeak-helm
+
+Speech-enables Helm, a powerful incremental completion and selection framework.
+
+**Features:**
+
+- Fixes helm-help mode prompt repetition during navigation
+- Emacspeak prefix key (C-e) now works in helm help mode
+- Proper silence control via emacspeak-speak-messages
+- Complete standalone implementation (no core Emacspeak patches needed)
+
+**Based on:** Patch by Parham Doustdar (Emacspeak mailing list, December 26, 2025)
 
 ### voiceover-support
 
@@ -293,6 +312,7 @@ Add your extension to `emacspeak-support.el`:
   '((corfu . "emacspeak-corfu")
     (which-key . "emacspeak-which-key")
     (markdown . "emacspeak-markdown")
+    (helm . "emacspeak-helm")
     (your-package . "emacspeak-your-package"))  ;; Add this line
   "Alist of extension symbols to file names.")
 ```
@@ -368,6 +388,7 @@ Look at existing extensions for reference:
 - `emacspeak-corfu.el` - Complex UI with annotations and position tracking
 - `emacspeak-which-key.el` - Auto-speak with timer integration
 - `emacspeak-markdown.el` - Custom navigation and voice personalities
+- `emacspeak-helm.el` - Advice-based improvements and custom key dispatchers
 
 ### Getting Help
 
@@ -379,7 +400,7 @@ Look at existing extensions for reference:
 
 - Emacs 31+
 - Emacspeak
-- Target packages (corfu, which-key, markdown-mode, etc.) as needed
+- Target packages (corfu, which-key, markdown-mode, helm, etc.) as needed
 
 ## Repository Structure
 
@@ -387,11 +408,13 @@ Look at existing extensions for reference:
 emacspeak-support/
 ├── .gitignore                 # Ignore patterns
 ├── README.md                  # This file
+├── TODO.md                    # Future improvements
 ├── example-config.el          # Example configuration
 ├── emacspeak-support.el       # Main loader with toggle functionality
 ├── emacspeak-corfu.el         # Corfu support
 ├── emacspeak-which-key.el     # Which-Key support
 ├── emacspeak-markdown.el      # Markdown-mode support
+├── emacspeak-helm.el          # Helm support
 └── voiceover-support.el       # VoiceOver-style keybindings
 ```
 
