@@ -402,22 +402,6 @@ Look at existing extensions for reference:
 - Emacspeak
 - Target packages (corfu, which-key, markdown-mode, helm, etc.) as needed
 
-## Repository Structure
-
-```
-emacspeak-support/
-├── .gitignore                 # Ignore patterns
-├── README.md                  # This file
-├── TODO.md                    # Future improvements
-├── example-config.el          # Example configuration
-├── emacspeak-support.el       # Main loader with toggle functionality
-├── emacspeak-corfu.el         # Corfu support
-├── emacspeak-which-key.el     # Which-Key support
-├── emacspeak-markdown.el      # Markdown-mode support
-├── emacspeak-helm.el          # Helm support
-└── voiceover-support.el       # VoiceOver-style keybindings
-```
-
 ## License
 
 GNU General Public License v2.0 or later
