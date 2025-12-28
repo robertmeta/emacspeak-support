@@ -38,3 +38,6 @@ AGENTS.md
 *-ai.md
 AI-*.md
 ai-*.md
+
+# Claude Code settings (local only)
+.claude/
