@@ -27,10 +27,26 @@
 ;; structures. Instead of hearing "three pounds space", users will hear
 ;; "heading level 3" when navigating headers.
 ;;
-;; This module also provides `emacspeak-markdown-reading-mode`, a minor mode
+;; This module also provides `es-markdown-reading-mode`, a minor mode
 ;; that strips markup syntax when reading content, so you hear "car" instead
 ;; of "star star car star star" for **car**. Voice personalities still apply
 ;; to indicate emphasis, headings, etc.
+;;
+;; Reading mode handles many markdown constructs intelligently:
+;; - Images: ![alt](url) → "image: alt"
+;; - Links: [text](url) → "text link" (no URL noise)
+;; - Task lists: - [x] → "checked: text" or "unchecked: text"
+;; - Code fences: ``` → "code block: language"
+;; - Tables: Announces "row N column N content"
+;; - Footnotes: [^1] → "footnote 1"
+;; - Horizontal rules: --- → "section separator"
+;; - HTML comments: <!-- --> → "comment"
+;; - Reference links: Skipped entirely
+;; - Escaped chars: \* → * (removes backslash)
+;;
+;; Keybindings:
+;; - C-c C-s h: Speak current heading
+;; - C-c C-s r: Toggle reading mode
 
 ;;; Code:
 
@@ -119,6 +135,80 @@ Returns format like 'heading level 2: Introduction'."
     (beginning-of-line)
     (looking-at-p "^[ \t]*[-*+][ \t]+\\|^[ \t]*[0-9]+\\.[ \t]+")))
 
+(defun emacspeak-markdown--at-task-list-p ()
+  "Return non-nil if point is at a task list item.
+Returns 'checked or 'unchecked if it's a task list."
+  (save-excursion
+    (beginning-of-line)
+    (cond
+     ((looking-at "^[ \t]*[-*+][ \t]+\\[x\\]") 'checked)
+     ((looking-at "^[ \t]*[-*+][ \t]+\\[X\\]") 'checked)
+     ((looking-at "^[ \t]*[-*+][ \t]+\\[ \\]") 'unchecked)
+     (t nil))))
+
+(defun emacspeak-markdown--at-horizontal-rule-p ()
+  "Return non-nil if point is at a horizontal rule."
+  (save-excursion
+    (beginning-of-line)
+    (looking-at-p "^[ \t]*\\(---+\\|\\*\\*\\*+\\|___+\\)[ \t]*$")))
+
+(defun emacspeak-markdown--at-code-fence-p ()
+  "Return language name if at code fence start, 'end if at fence end, nil otherwise."
+  (save-excursion
+    (beginning-of-line)
+    (cond
+     ((looking-at "^[ \t]*```\\([a-zA-Z0-9_+-]*\\)[ \t]*$")
+      (let ((lang (match-string 1)))
+        (if (string-empty-p lang) "code" lang)))
+     ((looking-at "^[ \t]*~~~\\([a-zA-Z0-9_+-]*\\)[ \t]*$")
+      (let ((lang (match-string 1)))
+        (if (string-empty-p lang) "code" lang)))
+     (t nil))))
+
+(defun emacspeak-markdown--at-html-comment-p ()
+  "Return non-nil if point is at an HTML comment line."
+  (save-excursion
+    (beginning-of-line)
+    (looking-at-p "^[ \t]*<!--.*-->[ \t]*$")))
+
+(defun emacspeak-markdown--at-reference-link-def-p ()
+  "Return non-nil if point is at a reference link definition."
+  (save-excursion
+    (beginning-of-line)
+    (looking-at-p "^[ \t]*\\[.+\\]:[ \t]+\\S-")))
+
+(defun emacspeak-markdown--at-footnote-def-p ()
+  "Return footnote number if at footnote definition, nil otherwise."
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at "^\\[\\^\\([^]]+\\)\\]:[ \t]*")
+      (match-string 1))))
+
+(defun emacspeak-markdown--at-indented-code-p ()
+  "Return non-nil if point is at an indented code block line (4+ spaces)."
+  (save-excursion
+    (beginning-of-line)
+    (and (looking-at "^    \\|^\t")
+         (not (emacspeak-markdown--at-list-item-p)))))
+
+(defun emacspeak-markdown--at-table-row-p ()
+  "Return non-nil if point is at a table row."
+  (save-excursion
+    (beginning-of-line)
+    (looking-at-p "^[ \t]*|.*|[ \t]*$")))
+
+(defun emacspeak-markdown--at-table-separator-p ()
+  "Return non-nil if point is at a table separator line."
+  (save-excursion
+    (beginning-of-line)
+    (looking-at-p "^[ \t]*|[ \t]*[-:]+[ \t]*|")))
+
+(defun emacspeak-markdown--at-definition-list-p ()
+  "Return non-nil if point is at a definition list definition line."
+  (save-excursion
+    (beginning-of-line)
+    (looking-at-p "^:[ \t]+")))
+
 (defun emacspeak-markdown--speak-list-item ()
   "Speak list item with appropriate context."
   (if (emacspeak-markdown--at-list-item-p)
@@ -148,16 +238,53 @@ This makes reading more pleasant by removing syntax noise like
       (setq result (replace-regexp-in-string "`\\([^`]+\\)`" "\\1" result))
       ;; Remove strikethrough ~~
       (setq result (replace-regexp-in-string "~~\\([^~]+\\)~~" "\\1" result))
-      ;; Remove link markup [text](url) -> text (link)
+      ;; Remove escaped characters (backslashes)
+      (setq result (replace-regexp-in-string "\\\\\\(.\\)" "\\1" result))
+      ;; Handle images: ![alt](url) -> "image: alt"
+      (setq result (replace-regexp-in-string "!\\[\\([^]]+\\)\\](\\([^)]+\\))" "image: \\1" result))
+      ;; Remove link markup [text](url) -> text link
       (setq result (replace-regexp-in-string "\\[\\([^]]+\\)\\](\\([^)]+\\))" "\\1 link" result))
-      ;; Remove reference-style link markup [text][ref] -> text (link)
+      ;; Remove reference-style link markup [text][ref] -> text link
       (setq result (replace-regexp-in-string "\\[\\([^]]+\\)\\]\\[[^]]*\\]" "\\1 link" result))
-      ;; Remove list markers (-, *, +, numbers)
+      ;; Remove autolink angle brackets <url> -> url
+      (setq result (replace-regexp-in-string "<\\([^>]+\\)>" "\\1" result))
+      ;; Handle footnote markers [^1] -> "footnote 1"
+      (setq result (replace-regexp-in-string "\\[\\^\\([^]]+\\)\\]" "footnote \\1" result))
+      ;; Remove task list markers but keep state indication
+      (setq result (replace-regexp-in-string "^\\s-*[-*+]\\s-+\\[x\\]\\s-+" "checked: " result))
+      (setq result (replace-regexp-in-string "^\\s-*[-*+]\\s-+\\[X\\]\\s-+" "checked: " result))
+      (setq result (replace-regexp-in-string "^\\s-*[-*+]\\s-+\\[ \\]\\s-+" "unchecked: " result))
+      ;; Remove regular list markers (-, *, +, numbers)
       (setq result (replace-regexp-in-string "^\\s-*[-*+]\\s-+" "" result))
       (setq result (replace-regexp-in-string "^\\s-*[0-9]+\\.\\s-+" "" result))
       ;; Remove blockquote markers
       (setq result (replace-regexp-in-string "^>+\\s-*" "" result))
+      ;; Remove leading spaces from indented code blocks
+      (setq result (replace-regexp-in-string "^    " "" result))
+      (setq result (replace-regexp-in-string "^\t" "" result))
+      ;; Remove table pipes
+      (setq result (replace-regexp-in-string "^\\s-*|\\s-*" "" result))
+      (setq result (replace-regexp-in-string "\\s-*|\\s-*$" "" result))
+      (setq result (replace-regexp-in-string "\\s-*|\\s-*" " " result))
+      ;; Remove definition list markers
+      (setq result (replace-regexp-in-string "^:\\s-+" "" result))
       result)))
+
+(defun emacspeak-markdown--speak-table-row ()
+  "Speak table row with column announcements."
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at "^[ \t]*|\\(.*\\)|[ \t]*$")
+      (let* ((content (match-string 1))
+             (cells (split-string content "|" t "[ \t]+"))
+             (row-num 1) ; Could be enhanced to track actual row number
+             (col-num 1)
+             (result ""))
+        (setq result (format "row %d " row-num))
+        (dolist (cell cells)
+          (setq result (concat result (format "column %d %s " col-num (string-trim cell))))
+          (setq col-num (1+ col-num)))
+        result))))
 
 (defun emacspeak-markdown--speak-line-clean ()
   "Speak current line with markdown markup removed."
@@ -166,16 +293,68 @@ This makes reading more pleasant by removing syntax noise like
          (text (buffer-substring start end))
          (clean-text (emacspeak-markdown--strip-markup text))
          (heading-info (emacspeak-markdown--get-heading-info))
+         (task-state (emacspeak-markdown--at-task-list-p))
+         (code-fence (emacspeak-markdown--at-code-fence-p))
+         (footnote-num (emacspeak-markdown--at-footnote-def-p))
          (prefix ""))
     ;; Build announcement prefix for special line types
     (cond
+     ;; Horizontal rules - just announce and play icon
+     ((emacspeak-markdown--at-horizontal-rule-p)
+      (emacspeak-icon 'item)
+      (dtk-speak "section separator")
+      (setq prefix nil)) ; Don't speak the line content
+
+     ;; HTML comments - just say "comment"
+     ((emacspeak-markdown--at-html-comment-p)
+      (dtk-speak "comment")
+      (setq prefix nil))
+
+     ;; Reference link definitions - skip entirely
+     ((emacspeak-markdown--at-reference-link-def-p)
+      (setq prefix nil))
+
+     ;; Table separator lines - skip
+     ((emacspeak-markdown--at-table-separator-p)
+      (setq prefix nil))
+
+     ;; Code fences
+     (code-fence
+      (emacspeak-icon 'open-object)
+      (dtk-speak (format "code block: %s" code-fence))
+      (setq prefix nil))
+
+     ;; Footnote definitions
+     (footnote-num
+      (setq prefix (format "footnote %s definition: " footnote-num)))
+
+     ;; Table rows
+     ((emacspeak-markdown--at-table-row-p)
+      (let ((table-speech (emacspeak-markdown--speak-table-row)))
+        (when table-speech
+          (dtk-speak table-speech)
+          (setq prefix nil))))
+
+     ;; Indented code blocks
+     ((emacspeak-markdown--at-indented-code-p)
+      (setq prefix "code: "))
+
+     ;; Definition lists
+     ((emacspeak-markdown--at-definition-list-p)
+      (setq prefix "definition: "))
+
      ;; Headings get level announcement
      (heading-info
       (when (string-match "heading level \\([0-9]+\\)" heading-info)
         (let ((level (match-string 1 heading-info)))
           (emacspeak-icon 'section)
           (setq prefix (format "level %s " level)))))
-     ;; List items get brief announcement
+
+     ;; Task list items - already handled in strip-markup with checked/unchecked
+     (task-state
+      (emacspeak-icon 'mark-object))
+
+     ;; Regular list items get brief announcement
      ((emacspeak-markdown--at-list-item-p)
       (let ((indent (save-excursion
                       (beginning-of-line)
@@ -185,8 +364,10 @@ This makes reading more pleasant by removing syntax noise like
          ((= indent 0) (setq prefix "item "))
          ((< indent 4) (setq prefix "subitem "))
          (t (setq prefix "subsubitem "))))))
-    ;; Speak with prefix
-    (dtk-speak (concat prefix (or clean-text "")))))
+
+    ;; Speak with prefix (only if prefix wasn't set to nil)
+    (when prefix
+      (dtk-speak (concat prefix (or clean-text ""))))))
 
 (defun emacspeak-markdown--speak-paragraph-clean ()
   "Speak current paragraph with markdown markup removed."
